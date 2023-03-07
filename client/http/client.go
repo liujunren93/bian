@@ -1,0 +1,93 @@
+package http
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+
+	"github.com/liujunren93/bian/client"
+)
+
+type HttpClient struct {
+	conf client.Config
+}
+
+func NewClient(conf client.Config) *HttpClient {
+	return &HttpClient{conf: conf}
+}
+
+func (c *HttpClient) Post(path string, header http.Header, queryData, postData client.Signer, dest interface{}) error {
+	if header == nil {
+		header = http.Header{}
+	}
+	header.Add("X-MBX-APIKEY", c.conf.ApiKey)
+	if queryData != nil && queryData.Len() > 0 {
+		client.Sign(queryData, c.conf.ApiSecret)
+		path = c.conf.BaseApi + path
+		if queryData.Len() > 0 {
+			path += "?" + queryData.String()
+		}
+	}
+
+	var red io.Reader
+	if postData != nil && postData.Len() > 0 {
+		client.Sign(postData, c.conf.ApiSecret)
+		buf, err := json.Marshal(postData)
+		if err != nil {
+			return err
+		}
+		red = bytes.NewReader(buf)
+	}
+	req, err := http.NewRequest("POST", path, red)
+	if err != nil {
+		return err
+	}
+
+	req.Header = header
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	resData, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(resData, dest)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *HttpClient) Get(path string, header http.Header, data client.QueryParams, dest interface{}) error {
+	if header == nil {
+		header = http.Header{}
+	}
+
+	header.Add("X-MBX-APIKEY", c.conf.ApiKey)
+
+	client.Sign(data, c.conf.ApiSecret)
+
+	path = c.conf.BaseApi + path + "?" + data.String()
+	req, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return err
+	}
+	req.Header = header
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	resData, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(resData, dest)
+	if err != nil {
+		return err
+	}
+	return nil
+}
