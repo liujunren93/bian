@@ -9,6 +9,16 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type Params struct {
+	ID     interface{} `json:"id,omitempty"`
+	Method string      `json:"method,omitempty"`
+	Params interface{} `json:"params,omitempty"`
+}
+
+func (r Params) Hash() string {
+	return fmt.Sprintf("%s_%v", r.Method, r.ID)
+}
+
 type wsClient struct {
 	conf  client.Config
 	wsmap map[string]*websocket.Conn
@@ -20,12 +30,13 @@ func NewClient(conf client.Config) *wsClient {
 	return &cli
 }
 
-func (cli *wsClient) newClient(path string, header http.Header) (*websocket.Conn, error) {
+func (cli *wsClient) newClient(path string, hash string, header http.Header) (*websocket.Conn, error) {
 	// cli.wsmu.RLock()
+
 	if cli.wsmap == nil {
 		cli.wsmap = make(map[string]*websocket.Conn)
 	}
-	if c, ok := cli.wsmap[path]; ok {
+	if c, ok := cli.wsmap[hash]; ok {
 		return c, nil
 	}
 	if len(header) == 0 {
@@ -36,48 +47,39 @@ func (cli *wsClient) newClient(path string, header http.Header) (*websocket.Conn
 	if err != nil {
 		return nil, err
 	}
-	cli.wsmap[path] = ws
+	cli.wsmap[hash] = ws
 	return ws, nil
 }
 
-func (cli *wsClient) SendSign(path string, header http.Header, data client.Params) error {
-	if header == nil {
-		header = http.Header{}
-	}
+func (cli *wsClient) SendSign(path string, header http.Header, req Params) error {
 
-	header.Add("X-MBX-APIKEY", cli.conf.ApiKey)
-	cc, err := cli.newClient(path, header)
+	cc, err := cli.newClient(path, req.Hash(), header)
 	if err != nil {
 		return err
 	}
 
-	client.Sign(data, cli.conf.ApiSecret)
-	return cc.WriteJSON(data)
+	client.Sign(req.Params.(client.Signer), cli.conf.ApiSecret)
+	return cc.WriteJSON(req)
 }
 
 func (cli *wsClient) Pongs() {
 
 }
 
-func (cli *wsClient) Send(method, path string, header http.Header, data interface{}) error {
-
-	cc, err := cli.newClient(path, header)
+func (cli *wsClient) Send(path string, header http.Header, req Params) error {
+	if len(path) == 0 {
+		path = req.Method
+	}
+	cc, err := cli.newClient(path, path, header)
 	if err != nil {
 		return err
 	}
 
-	var req = map[string]interface{}{
-		"id":     1,
-		"method": method,
-	}
-	if data != nil {
-		req["params"] = data
-	}
 	return cc.WriteJSON(&req)
 }
 
 func (cli *wsClient) Receiver(path string, f func([]byte)) error {
-	cc, err := cli.newClient(path, nil)
+	cc, err := cli.newClient(path, path, nil)
 	if err != nil {
 		return err
 	}
@@ -86,7 +88,6 @@ func (cli *wsClient) Receiver(path string, f func([]byte)) error {
 			_, data, err := cc.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err) {
-					fmt.Println("IsUnexpectedCloseError", err)
 					return
 				}
 			}
