@@ -43,6 +43,7 @@ func (cli *wsClient) newClient(path string, hash string, header http.Header) (*w
 		header = http.Header{}
 	}
 	header.Add("X-MBX-APIKEY", cli.conf.ApiKey)
+	fmt.Println(cli.conf.BaseApi + path)
 	ws, _, err := websocket.DefaultDialer.Dial(cli.conf.BaseApi+path, header)
 	if err != nil {
 		return nil, err
