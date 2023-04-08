@@ -20,7 +20,7 @@ type Signer interface {
 
 func Sign(t1 Signer, secret string) Signer {
 	timestamp := time.Now().Local().UnixMilli()
-	if t1 != nil && t1.Len() > 0 {
+	if t1 != nil {
 		t1.Add("timestamp", timestamp)
 
 		t1.Add("signature", ComputeHmacSha256(t1.String(), secret))

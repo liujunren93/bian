@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -23,14 +24,15 @@ func (c *HttpClient) do(sign bool, path, method string, header http.Header, quer
 	}
 	header.Add("X-MBX-APIKEY", c.conf.ApiKey)
 	path = c.conf.BaseApi + path
-	if queryData != nil && queryData.Len() > 0 {
-		if sign {
-			client.Sign(queryData, c.conf.ApiSecret)
+	if sign {
+		if queryData == nil {
+			queryData = client.QueryParams{}
 		}
+		client.Sign(queryData, c.conf.ApiSecret)
+	}
 
-		if queryData.Len() > 0 {
-			path += "?" + queryData.String()
-		}
+	if queryData.Len() > 0 {
+		path += "?" + queryData.String()
 	}
 	var red io.Reader
 	if postData != nil && postData.Len() > 0 {
@@ -44,6 +46,7 @@ func (c *HttpClient) do(sign bool, path, method string, header http.Header, quer
 		}
 		red = bytes.NewReader(buf)
 	}
+
 	req, err := http.NewRequest(method, path, red)
 	if err != nil {
 		return err
@@ -58,6 +61,8 @@ func (c *HttpClient) do(sign bool, path, method string, header http.Header, quer
 	if err != nil {
 		return err
 	}
+	fmt.Println(path)
+	fmt.Println(string(resData))
 	err = json.Unmarshal(resData, dest)
 	if err != nil {
 		return err
