@@ -99,12 +99,16 @@ func (m Params) String() string {
 	if m == nil {
 		return ""
 	}
+	signature := m["signature"]
+	delete(m, "signature")
 	var buf strings.Builder
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
+
 	for _, k := range keys {
 		if buf.Len() > 0 {
 			buf.WriteByte('&')
@@ -113,9 +117,10 @@ func (m Params) String() string {
 		keyEscaped := url.QueryEscape(k)
 		buf.WriteString(keyEscaped)
 		buf.WriteByte('=')
-
 		buf.WriteString(url.QueryEscape(fmt.Sprintf("%v", vs)))
-
+	}
+	if signature != nil {
+		return buf.String() + "&signature=" + signature.(string)
 	}
 	return buf.String()
 
@@ -128,7 +133,6 @@ func (m Params) String() string {
 	// 	}
 	// }
 
-	return buf.String()
 }
 func (m Params) Len() int {
 	return len(m)

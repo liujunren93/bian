@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
@@ -10,6 +11,8 @@ import (
 	"github.com/liujunren93/bian/client/http"
 	"github.com/liujunren93/bian/client/websocket"
 )
+
+type SideType int8
 
 const (
 	ENUM_SIDE_BUY  = "buy"
@@ -42,6 +45,9 @@ func (a *Api) WsClient(baseApi string) *websocket.WsClient {
 type Interval string
 
 func (i Interval) String() string {
+	return string(i)
+}
+func (i Interval) Name() string {
 	return string(i)
 }
 
@@ -114,6 +120,10 @@ type KLine struct {
 	Q          float64  `json:"Q"` // 主动买入的成交额
 }
 
+func (k *KLine) String() string {
+	return fmt.Sprintf("ID:%d,FirstPrice:%v,LastPrice:%v,HightPrice:%v,LowPrice,%v,Amplitude:%v", k.FirestID, k.FirstPrice, k.LastPrice, k.HightPrice, k.LowPrice, k.Amplitude())
+}
+
 type KLineKind int8
 
 func (k KLineKind) String() string {
@@ -158,41 +168,137 @@ const (
 	KLineKind_YIN_PINBAR
 )
 
-func (k *KLine) Kind(level []float32) KLineKind {
+func (k *KLine) IsStatic(levels []float32) bool {
+	kind := k.kind(levels)
+	return kind == KLineKind_YANG_3 || kind == KLineKind_YANG_4 || kind == KLineKind_YANG_PINBAR || kind == KLineKind_YIN_3 || kind == KLineKind_YIN_4 || kind == KLineKind_YIN_PINBAR
+
+}
+func (k *KLine) Kind(levels []float32) KLineKind {
 	if !k.IsOver {
 		return KLineKind_UNKNOWN
 	}
+	// t, _ := k.Interval.toDuration()
+	return k.kind(levels)
+
+}
+
+func (k *KLine) kind(levels []float32) (klkind KLineKind) {
 	const day = time.Hour * 24
 	// t, _ := k.Interval.toDuration()
 	// times := float64(day) / float64(t)
-	if ((k.HightPrice-k.LowPrice)-math.Abs(k.FirstPrice-k.LastPrice))/math.Abs(k.FirstPrice-k.LastPrice) >= 2 {
-		if k.LastPrice > k.FirstPrice {
-			return KLineKind_YANG_PINBAR
-		} else {
-			return KLineKind_YIN_PINBAR
+	switch {
+	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(levels[0]): //大阳
+		klkind = KLineKind_YANG_1
+
+	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(levels[1]): //中阳
+		klkind = KLineKind_YANG_2
+	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(levels[2]): //小阳
+		klkind = KLineKind_YANG_3
+	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= 0: //阳十字
+		klkind = KLineKind_YANG_4
+	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(levels[0]): //大阴
+		klkind = KLineKind_YIN_1
+	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(levels[1]): //中阴
+		klkind = KLineKind_YIN_2
+	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(levels[2]): //小阴
+		klkind = KLineKind_YIN_3
+	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= 0: //阴十字
+		klkind = KLineKind_YIN_4
+
+	}
+	if klkind == KLineKind_YIN_4 || klkind == KLineKind_YIN_3 || klkind == KLineKind_YANG_4 || klkind == KLineKind_YANG_3 {
+		if ((k.HightPrice-k.LowPrice)-math.Abs(k.FirstPrice-k.LastPrice))/math.Abs(k.FirstPrice-k.LastPrice) >= 2 {
+			if k.LastPrice > k.FirstPrice {
+				klkind = KLineKind_YANG_PINBAR
+			} else {
+				klkind = KLineKind_YIN_PINBAR
+			}
 		}
 	}
-	switch {
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(level[0]): //大阳
-		return KLineKind_YANG_1
 
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(level[1]): //中阳
-		return KLineKind_YANG_2
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(level[2]): //小阳
-		return KLineKind_YANG_3
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= 0: //阳十字
-		return KLineKind_YANG_4
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(level[0]): //大阴
-		return KLineKind_YIN_1
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(level[1]): //中阴
-		return KLineKind_YIN_2
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(level[2]): //小阴
-		return KLineKind_YIN_3
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= 0: //阴十字
-		return KLineKind_YIN_4
+	return
+
+}
+
+type LeadLevel int8
+
+const (
+	LEAD_LEVEL_SMALL LeadLevel = iota
+	LEAD_LEVEL_MEDIUM
+	LEAD_LEVEL_LARGE
+)
+
+// 振幅 实体长度<0:阴线 >0:阳线
+func (k *KLine) Amplitude() float64 {
+	return k.LastPrice - k.FirstPrice
+}
+
+func (k *KLine) BigAmplitude() float64 {
+	return k.HightPrice - k.LowPrice
+}
+
+func (k *KLine) LeadLevel(levels []float32) (top, down LeadLevel) {
+	top, down = LEAD_LEVEL_LARGE, LEAD_LEVEL_LARGE
+	var leadChangeTop float64
+	var leadChangeDown float64
+	kind := k.kind(levels)
+	if k.Amplitude() > 0 {
+		leadChangeTop = k.HightPrice - k.LastPrice
+		leadChangeDown = k.FirstPrice - k.LowPrice
+	} else {
+		leadChangeTop = k.HightPrice - k.FirstPrice
+		leadChangeDown = k.LastPrice - k.LowPrice
+	}
+	amplitude := math.Abs(k.Amplitude())
+	switch {
+	case kind == KLineKind_YANG_1 || kind == KLineKind_YIN_1:
+		if leadChangeTop >= amplitude {
+			top = LEAD_LEVEL_LARGE
+		} else if leadChangeTop >= amplitude/2 {
+			top = LEAD_LEVEL_MEDIUM
+		}
+		if leadChangeDown > amplitude {
+			down = LEAD_LEVEL_LARGE
+		}
+		if leadChangeDown > amplitude/2 {
+			down = LEAD_LEVEL_MEDIUM
+		}
+	case kind == KLineKind_YANG_2 || kind == KLineKind_YIN_2:
+		if leadChangeTop >= amplitude*1.5 {
+			top = LEAD_LEVEL_LARGE
+		} else if leadChangeTop >= amplitude {
+			top = LEAD_LEVEL_MEDIUM
+		}
+		if leadChangeDown > amplitude*1.5 {
+			down = LEAD_LEVEL_LARGE
+		} else if leadChangeDown >= amplitude {
+			down = LEAD_LEVEL_MEDIUM
+		}
+	case kind == KLineKind_YANG_3 || kind == KLineKind_YIN_3:
+		if leadChangeTop >= amplitude*3 {
+			top = LEAD_LEVEL_LARGE
+		} else if leadChangeTop >= amplitude*1.5 {
+			top = LEAD_LEVEL_MEDIUM
+		}
+		if leadChangeDown > amplitude*3 {
+			down = LEAD_LEVEL_LARGE
+		} else if leadChangeDown >= amplitude*1.5 {
+			down = LEAD_LEVEL_MEDIUM
+		}
+	case kind == KLineKind_YANG_4 || kind == KLineKind_YIN_4 || kind == KLineKind_YANG_PINBAR || kind == KLineKind_YIN_PINBAR:
+		if leadChangeTop >= amplitude*4 {
+			top = LEAD_LEVEL_LARGE
+		} else if leadChangeTop >= amplitude*2 {
+			top = LEAD_LEVEL_MEDIUM
+		}
+		if leadChangeDown > amplitude*4 {
+			down = LEAD_LEVEL_LARGE
+		} else if leadChangeDown >= amplitude*2 {
+			down = LEAD_LEVEL_MEDIUM
+		}
 
 	}
 
-	return KLineKind_UNKNOWN
+	return
 
 }

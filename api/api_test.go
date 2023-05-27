@@ -2,12 +2,10 @@ package api
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 )
 
 func TestApi(t *testing.T) {
-	sync.NewCond(l sync.Locker)
 	var k = KLine{
 		Symbol:     "",
 		BeginTime:  0,
@@ -15,10 +13,10 @@ func TestApi(t *testing.T) {
 		Interval:   "15m",
 		FirestID:   0,
 		LastID:     0,
-		FirstPrice: 28071.8,
-		HightPrice: 28084,
-		LowPrice:   27651,
-		LastPrice:  27698.5,
+		FirstPrice: 26946.80,
+		HightPrice: 26946.80,
+		LowPrice:   26830,
+		LastPrice:  26893,
 
 		Volume: 0,
 		Cnt:    0,
@@ -27,7 +25,11 @@ func TestApi(t *testing.T) {
 		V:      0,
 		Q:      0,
 	}
-
-	fmt.Println(k.Kind([]float32{0.005, 0.003, 0.001}))
+	// - 0.002
+	//         - 0.003
+	//         - 0.005
+	// 0.0015 0.0025 0.0035
+	// 0.0011
+	fmt.Println(k.Kind([]float32{0.005, 0.0003, 0.0002}))
 
 }

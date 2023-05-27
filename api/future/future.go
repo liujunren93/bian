@@ -3,7 +3,9 @@ package future
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/liujunren93/bian/api"
@@ -16,37 +18,63 @@ type Future struct {
 	api.Api
 }
 
-const baseApi = "https://dapi.binance.com"
+const baseApi = "https://fapi.binance.com"
 
 func NewFuture(conf *client.Config) *Future {
 	return &Future{
 		Api: api.Api{
-			ApiKey:    conf.ApiSecret,
+			ApiKey:    conf.ApiKey,
 			ApiSecret: conf.ApiSecret,
 			BaseApi:   baseApi,
 		},
 	}
 }
 
-func (f *Future) Trade(side string, price, quantity float64) error {
+func (f *Future) TradeParams(symbol, side string, params client.Params) error {
+	side = strings.ToUpper(side)
 	var res map[string]interface{}
-	positionSide := "SHORT"
-	if side == "BUY" {
-		positionSide = "LONG"
+	if side != "" {
+		params["side"] = side
 	}
-	f.HttpClient(baseApi).Post("/fapi/v1/order", nil, client.Params{
-		"symbol":       "BTCBUSD",
-		"side":         side,
-		"type":         "LIMIT",
-		"price":        price,
-		"quantity":     quantity,
-		"timeInForce":  "GTC",
-		"positionSide": positionSide,
-	}, nil, &res)
-	if res["code"] != 200 {
-		return fmt.Errorf("%v", res)
+
+	params["symbol"] = strings.ToUpper(symbol)
+
+	err := f.HttpClient(baseApi).Post("/fapi/v1/order", nil, params, nil, &res)
+
+	if _, ok := res["code"]; ok && res["code"] != 200 {
+		return fmt.Errorf("res:%v,params:%#v", res, params)
 	}
-	return nil
+	return err
+}
+func (f *Future) CancelOrder(symbol string, params client.Params) error {
+
+	var res map[string]interface{}
+
+	params["symbol"] = strings.ToUpper(symbol)
+
+	err := f.HttpClient(baseApi).Delete("/fapi/v1/order", nil, params, nil, &res)
+
+	if _, ok := res["code"]; ok && res["code"] != 200 {
+		return fmt.Errorf("res:%v,params:%#v", res, params)
+	}
+	return err
+}
+
+func (f *Future) CancelAllOrder(symbol string) error {
+
+	var res map[string]interface{}
+	var params = client.Params{
+		"symbol": strings.ToUpper(symbol),
+	}
+	params["symbol"] = strings.ToUpper(symbol)
+	h := http.Header{}
+	h.Add("Content-Type", "application/x-www-form-urlencoded")
+	err := f.HttpClient(baseApi).Delete("/fapi/v1/allOpenOrders", h, params, nil, &res)
+
+	if _, ok := res["code"]; ok && res["code"] != 200 {
+		return fmt.Errorf("res:%v,params:%#v", res, params)
+	}
+	return err
 }
 
 func (f *Future) SubscribeKline(path string, params []string, callback func(*api.KLine, error)) error {
@@ -116,6 +144,9 @@ func (f *Future) SubscribeKline(path string, params []string, callback func(*api
 			}
 
 			decoder.Decode(tmpKlmap)
+			if strings.Contains(symbol, "@") {
+				symbol = strings.Split(symbol, "@")[0]
+			}
 			kl.FirstPrice, _ = strconv.ParseFloat(tmpKlmap["o"].(string), 64)
 			kl.LastPrice, _ = strconv.ParseFloat(tmpKlmap["c"].(string), 64)
 			kl.HightPrice, _ = strconv.ParseFloat(tmpKlmap["h"].(string), 64)

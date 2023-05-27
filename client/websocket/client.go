@@ -32,7 +32,7 @@ func NewClient(conf client.Config) *WsClient {
 	return &cli
 }
 func (cli *WsClient) Close(hash string) {
-
+	fmt.Println(hash)
 	err := cli.wsmap[hash].Close()
 	if err != nil {
 		fmt.Println("ws close error:", err)

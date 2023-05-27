@@ -22,7 +22,9 @@ func (c *HttpClient) do(sign bool, path, method string, header http.Header, quer
 	if header == nil {
 		header = http.Header{}
 	}
+
 	header.Add("X-MBX-APIKEY", c.conf.ApiKey)
+
 	path = c.conf.BaseApi + path
 	if sign {
 		if queryData == nil {
@@ -46,7 +48,7 @@ func (c *HttpClient) do(sign bool, path, method string, header http.Header, quer
 		}
 		red = bytes.NewReader(buf)
 	}
-
+	fmt.Println(path, red)
 	req, err := http.NewRequest(method, path, red)
 	if err != nil {
 		return err
@@ -54,8 +56,10 @@ func (c *HttpClient) do(sign bool, path, method string, header http.Header, quer
 	req.Header = header
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
+
 	defer res.Body.Close()
 	resData, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -73,6 +77,12 @@ func (c *HttpClient) do(sign bool, path, method string, header http.Header, quer
 func (c *HttpClient) Post(path string, header http.Header, queryData, postData client.Signer, dest interface{}) error {
 
 	return c.do(true, path, "POST", header, queryData, postData, dest)
+
+}
+
+func (c *HttpClient) Delete(path string, header http.Header, queryData, postData client.Signer, dest interface{}) error {
+
+	return c.do(true, path, "DELETE", header, queryData, nil, dest)
 
 }
 
