@@ -13,10 +13,10 @@ func TestApi(t *testing.T) {
 		Interval:   "15m",
 		FirestID:   0,
 		LastID:     0,
-		FirstPrice: 26946.80,
-		HightPrice: 26946.80,
-		LowPrice:   26830,
-		LastPrice:  26893,
+		FirstPrice: 26365.3,
+		HightPrice: 26365.4,
+		LowPrice:   26270.6,
+		LastPrice:  26299.4,
 
 		Volume: 0,
 		Cnt:    0,
@@ -30,6 +30,6 @@ func TestApi(t *testing.T) {
 	//         - 0.005
 	// 0.0015 0.0025 0.0035
 	// 0.0011
-	fmt.Println(k.Kind([]float32{0.005, 0.0003, 0.0002}))
+	fmt.Println(k.Kind([]float32{0.0035, 0.0015, 0.0009}))
 
 }

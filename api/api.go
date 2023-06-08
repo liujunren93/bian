@@ -121,7 +121,7 @@ type KLine struct {
 }
 
 func (k *KLine) String() string {
-	return fmt.Sprintf("ID:%d,FirstPrice:%v,LastPrice:%v,HightPrice:%v,LowPrice,%v,Amplitude:%v", k.FirestID, k.FirstPrice, k.LastPrice, k.HightPrice, k.LowPrice, k.Amplitude())
+	return fmt.Sprintf("ID:%d,{FirstPrice:%v,LastPrice:%v,HightPrice:%v,LowPrice:%v},Amplitude:%v", k.FirestID, k.FirstPrice, k.LastPrice, k.HightPrice, k.LowPrice, k.Amplitude())
 }
 
 type KLineKind int8
@@ -170,7 +170,7 @@ const (
 
 func (k *KLine) IsStatic(levels []float32) bool {
 	kind := k.kind(levels)
-	return kind == KLineKind_YANG_3 || kind == KLineKind_YANG_4 || kind == KLineKind_YANG_PINBAR || kind == KLineKind_YIN_3 || kind == KLineKind_YIN_4 || kind == KLineKind_YIN_PINBAR
+	return kind == KLineKind_YANG_4 || kind == KLineKind_YANG_PINBAR || kind == KLineKind_YIN_4 || kind == KLineKind_YIN_PINBAR
 
 }
 func (k *KLine) Kind(levels []float32) KLineKind {
@@ -179,6 +179,28 @@ func (k *KLine) Kind(levels []float32) KLineKind {
 	}
 	// t, _ := k.Interval.toDuration()
 	return k.kind(levels)
+
+}
+
+func (k *KLine) KindIgnoreOver(levels []float32) KLineKind {
+
+	// t, _ := k.Interval.toDuration()
+	return k.kind(levels)
+
+}
+
+func (k *KLine) MultipleOfTheKKind(kd KLineKind, levels []float32) float64 {
+
+	if kd == KLineKind_YANG_1 || kd == KLineKind_YIN_1 {
+		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[0])
+	}
+	if kd == KLineKind_YANG_2 || kd == KLineKind_YIN_2 {
+		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[1])
+	}
+	if kd == KLineKind_YANG_3 || kd == KLineKind_YIN_3 {
+		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[2])
+	}
+	return 0
 
 }
 
