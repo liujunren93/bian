@@ -170,7 +170,7 @@ const (
 
 func (k *KLine) IsStatic(levels []float32) bool {
 	kind := k.kind(levels)
-	return kind == KLineKind_YANG_4 || kind == KLineKind_YANG_PINBAR || kind == KLineKind_YIN_4 || kind == KLineKind_YIN_PINBAR
+	return kind == KLineKind_YANG_3 || kind == KLineKind_YANG_4 || kind == KLineKind_YANG_PINBAR || kind == KLineKind_YIN_3 || kind == KLineKind_YIN_4 || kind == KLineKind_YIN_PINBAR
 
 }
 func (k *KLine) Kind(levels []float32) KLineKind {
