@@ -189,7 +189,8 @@ func (k *KLine) KindIgnoreOver(levels []float32) KLineKind {
 
 }
 
-func (k *KLine) MultipleOfTheKKind(kd KLineKind, levels []float32) float64 {
+// direction 方向 0 不限制，1，上方，2下方  此参数只针对pingber
+func (k *KLine) MultipleOfTheKKind(kd KLineKind, levels []float32, direction int8) float64 {
 
 	if kd == KLineKind_YANG_1 || kd == KLineKind_YIN_1 {
 		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[0])
@@ -200,6 +201,30 @@ func (k *KLine) MultipleOfTheKKind(kd KLineKind, levels []float32) float64 {
 	if kd == KLineKind_YANG_3 || kd == KLineKind_YIN_3 {
 		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[2])
 	}
+	if kd == KLineKind_YANG_PINBAR {
+		if direction == 0 {
+			return (k.HightPrice - k.LowPrice) / (k.LastPrice - k.FirstPrice)
+		}
+		if direction == 1 {
+			return (k.HightPrice - k.LastPrice) / (k.LastPrice - k.FirstPrice)
+		}
+		if direction == 2 {
+			return (k.FirstPrice - k.LowPrice) / (k.LastPrice - k.FirstPrice)
+		}
+	}
+	if kd == KLineKind_YIN_PINBAR {
+		if direction == 0 {
+			return (k.HightPrice - k.LowPrice) / (k.FirstPrice - k.LastPrice)
+		}
+		if direction == 1 {
+			return (k.HightPrice - k.FirstPrice) / (k.FirstPrice - k.LastPrice)
+		}
+		if direction == 2 {
+			return (k.LastPrice - k.LowPrice) / (k.FirstPrice - k.FirstPrice)
+		}
+
+	}
+
 	return 0
 
 }
