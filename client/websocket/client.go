@@ -32,21 +32,22 @@ func NewClient(conf client.Config) *WsClient {
 	return &cli
 }
 func (cli *WsClient) Close(hash string) {
-	fmt.Println(hash)
+	fmt.Println("Close:", hash)
+	fmt.Println("Close:", cli.wsmap)
 	err := cli.wsmap[hash].Close()
 	if err != nil {
 		fmt.Println("ws close error:", err)
 	}
 }
 
-func (cli *WsClient) newClient(path string, hash string, header http.Header) (*websocket.Conn, error) {
+func (cli *WsClient) newClient(path string, key string, header http.Header) (ws *websocket.Conn, hash string, err error) {
 	// cli.wsmu.RLock()
-	hash, _ = utils.Md5(hash)
+	hash, _ = utils.Md5(key)
 	if cli.wsmap == nil {
 		cli.wsmap = make(map[string]*websocket.Conn)
 	}
 	if c, ok := cli.wsmap[hash]; ok {
-		return c, nil
+		return c, "", nil
 	}
 	if len(header) == 0 {
 		header = http.Header{}
@@ -57,17 +58,17 @@ func (cli *WsClient) newClient(path string, hash string, header http.Header) (*w
 			return url.Parse(cli.conf.Proxy)
 		}
 	}
-	ws, _, err := websocket.DefaultDialer.Dial(cli.conf.BaseApi+path, header)
+	ws, _, err = websocket.DefaultDialer.Dial(cli.conf.BaseApi+path, header)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	cli.wsmap[hash] = ws
-	return ws, nil
+	return ws, "", nil
 }
 
 func (cli *WsClient) SendSign(path string, header http.Header, req Params) error {
 
-	cc, err := cli.newClient(path, req.Hash(), header)
+	cc, _, err := cli.newClient(path, req.Hash(), header)
 	if err != nil {
 		return err
 	}
@@ -84,7 +85,7 @@ func (cli *WsClient) Send(path string, header http.Header, req Params) error {
 	if len(path) == 0 {
 		path = req.Method
 	}
-	cc, err := cli.newClient(path, path, header)
+	cc, _, err := cli.newClient(path, path, header)
 	if err != nil {
 		return err
 	}
@@ -93,23 +94,24 @@ func (cli *WsClient) Send(path string, header http.Header, req Params) error {
 }
 
 func (cli *WsClient) Receiver(path string, f func([]byte)) (done chan struct{}, err error) {
-	cc, err := cli.newClient(path, path, nil)
+	cc, hash, err := cli.newClient(path, path, nil)
 	if err != nil {
 		return nil, err
 	}
 	done = make(chan struct{})
-	go func() {
+	go func(hash string) {
 		for {
 			_, data, err := cc.ReadMessage()
 			if err != nil {
+				fmt.Println("Receiver:", err)
 				done <- struct{}{}
 				close(done)
-				cli.Close(path)
+				cli.Close(hash)
 				return
 			}
 			f(data)
 		}
-	}()
+	}(hash)
 	return done, nil
 
 }
