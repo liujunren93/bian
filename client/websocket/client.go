@@ -47,7 +47,7 @@ func (cli *WsClient) newClient(path string, key string, header http.Header) (ws 
 		cli.wsmap = make(map[string]*websocket.Conn)
 	}
 	if c, ok := cli.wsmap[hash]; ok {
-		return c, "", nil
+		return c, hash, nil
 	}
 	if len(header) == 0 {
 		header = http.Header{}
@@ -58,12 +58,13 @@ func (cli *WsClient) newClient(path string, key string, header http.Header) (ws 
 			return url.Parse(cli.conf.Proxy)
 		}
 	}
-	ws, _, err = websocket.DefaultDialer.Dial(cli.conf.BaseApi+path, header)
+	ws, res, err := websocket.DefaultDialer.Dial(cli.conf.BaseApi, header)
 	if err != nil {
-		return nil, "", err
+		fmt.Println(res)
+		return nil, hash, err
 	}
 	cli.wsmap[hash] = ws
-	return ws, "", nil
+	return ws, hash, nil
 }
 
 func (cli *WsClient) SendSign(path string, header http.Header, req Params) error {
@@ -89,7 +90,6 @@ func (cli *WsClient) Send(path string, header http.Header, req Params) error {
 	if err != nil {
 		return err
 	}
-
 	return cc.WriteJSON(&req)
 }
 
