@@ -79,17 +79,18 @@ func (f *Future) CancelAllOrder(symbol string) error {
 
 func (f *Future) SubscribeKline(path string, params []string, callback func(*api.KLine, error)) error {
 	isOne := true
-	baseApi := "wss://fstream.binance.com/ws/"
-	if path == "" {
-		isOne = false
-		baseApi = "wss://fstream.binance.com/stream/?"
-		for i, p := range params {
-			if i != 0 {
-				path += "/"
-			}
-			path += p
-		}
-	}
+	baseApi := "wss://fstream.binance.com/ws"
+	// if path == "" {
+	// 	isOne = false
+	// 	baseApi = "wss://fstream.binance.com/stream/?"
+	// 	for i, p := range params {
+	// 		if i != 0 {
+	// 			path += "/"
+	// 		}
+	// 		path += p
+	// 	}
+	// }
+	// fmt.Println(path)
 	cli := f.WsClient(baseApi)
 
 	go func() {
@@ -147,6 +148,7 @@ func (f *Future) SubscribeKline(path string, params []string, callback func(*api
 			if strings.Contains(symbol, "@") {
 				symbol = strings.Split(symbol, "@")[0]
 			}
+			kl.FirestID = int(kl.BeginTime) / 1000
 			kl.FirstPrice, _ = strconv.ParseFloat(tmpKlmap["o"].(string), 64)
 			kl.LastPrice, _ = strconv.ParseFloat(tmpKlmap["c"].(string), 64)
 			kl.HightPrice, _ = strconv.ParseFloat(tmpKlmap["h"].(string), 64)
@@ -155,7 +157,7 @@ func (f *Future) SubscribeKline(path string, params []string, callback func(*api
 			kl.Amount, _ = strconv.ParseFloat(tmpKlmap["q"].(string), 64)
 			kl.V, _ = strconv.ParseFloat(tmpKlmap["V"].(string), 64)
 			kl.Q, _ = strconv.ParseFloat(tmpKlmap["Q"].(string), 64)
-			kl.Symbol = symbol
+			kl.Symbol = strings.ToLower(symbol)
 			kl.BeginTime = kl.BeginTime / 1000
 			kl.EndTime = kl.EndTime / 1000
 			callback(&kl, nil)

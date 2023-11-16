@@ -121,7 +121,8 @@ type KLine struct {
 }
 
 func (k *KLine) String() string {
-	return fmt.Sprintf("ID:%d,{FirstPrice:%v,LastPrice:%v,HightPrice:%v,LowPrice:%v},Amplitude:%v", k.FirestID, k.FirstPrice, k.LastPrice, k.HightPrice, k.LowPrice, k.Amplitude())
+	local, _ := time.LoadLocation("Asia/Shanghai")
+	return fmt.Sprintf("{ID:%d,FirstPrice:%v,LastPrice:%v,HightPrice:%v,LowPrice:%v,BeginTime:%s}", k.FirestID, k.FirstPrice, k.LastPrice, k.HightPrice, k.LowPrice, time.Unix(k.BeginTime, 0).In(local).Format("2006-01-02 15:04:05"))
 }
 
 type KLineKind int8
@@ -168,39 +169,42 @@ const (
 	KLineKind_YIN_PINBAR
 )
 
-func (k *KLine) IsStatic(levels []float32) bool {
-	kind := k.kind(levels)
+var levels = []float64{0.4, 0.12, 0.07, 0.0375}
+
+func (k *KLine) IsStatic(hightPrice, lowPrice float64) bool {
+	kind := k.kind(hightPrice, lowPrice)
 	return kind == KLineKind_YANG_3 || kind == KLineKind_YANG_4 || kind == KLineKind_YANG_PINBAR || kind == KLineKind_YIN_3 || kind == KLineKind_YIN_4 || kind == KLineKind_YIN_PINBAR
 
 }
-func (k *KLine) Kind(levels []float32) KLineKind {
+func (k *KLine) Kind(hightPrice, lowPrice float64) KLineKind {
 	if !k.IsOver {
 		return KLineKind_UNKNOWN
 	}
 	// t, _ := k.Interval.toDuration()
-	return k.kind(levels)
+	return k.kind(hightPrice, lowPrice)
 
 }
 
-func (k *KLine) KindIgnoreOver(levels []float32) KLineKind {
+func (k *KLine) KindIgnoreOver(hightPrice, lowPrice float64) KLineKind {
 
 	// t, _ := k.Interval.toDuration()
-	return k.kind(levels)
+	return k.kind(hightPrice, lowPrice)
 
 }
 
 // direction 方向 0 不限制，1，上方，2下方  此参数只针对pingber
-func (k *KLine) MultipleOfTheKKind(kd KLineKind, levels []float32, direction int8) float64 {
-
+func (k *KLine) MultipleOfTheKKind(kd KLineKind, hightPrice, lowPrice float64, direction int8) float64 {
+	cha := hightPrice - lowPrice
 	if kd == KLineKind_YANG_1 || kd == KLineKind_YIN_1 {
-		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[0])
+		return math.Abs((k.LastPrice-k.FirstPrice)/cha) / float64(levels[0])
 	}
 	if kd == KLineKind_YANG_2 || kd == KLineKind_YIN_2 {
-		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[1])
+		return math.Abs((k.LastPrice-k.FirstPrice)/cha) / float64(levels[1])
 	}
 	if kd == KLineKind_YANG_3 || kd == KLineKind_YIN_3 {
-		return math.Abs((k.LastPrice-k.FirstPrice)/k.FirstPrice) / float64(levels[2])
+		return math.Abs((k.LastPrice-k.FirstPrice)/cha) / float64(levels[2])
 	}
+
 	if kd == KLineKind_YANG_PINBAR {
 		if direction == 0 {
 			return (k.HightPrice - k.LowPrice) / (k.LastPrice - k.FirstPrice)
@@ -220,7 +224,7 @@ func (k *KLine) MultipleOfTheKKind(kd KLineKind, levels []float32, direction int
 			return (k.HightPrice - k.FirstPrice) / (k.FirstPrice - k.LastPrice)
 		}
 		if direction == 2 {
-			return (k.LastPrice - k.LowPrice) / (k.FirstPrice - k.FirstPrice)
+			return (k.LastPrice - k.LowPrice) / (k.FirstPrice - k.LastPrice)
 		}
 
 	}
@@ -229,30 +233,35 @@ func (k *KLine) MultipleOfTheKKind(kd KLineKind, levels []float32, direction int
 
 }
 
-func (k *KLine) kind(levels []float32) (klkind KLineKind) {
+func (k *KLine) kind(hightPrice, lowPrice float64) (klkind KLineKind) {
+	tint := hightPrice - lowPrice
 	const day = time.Hour * 24
 	// t, _ := k.Interval.toDuration()
 	// times := float64(day) / float64(t)
-	switch {
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(levels[0]): //大阳
-		klkind = KLineKind_YANG_1
 
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(levels[1]): //中阳
-		klkind = KLineKind_YANG_2
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= float64(levels[2]): //小阳
-		klkind = KLineKind_YANG_3
-	case (k.LastPrice-k.FirstPrice)/k.FirstPrice >= 0: //阳十字
-		klkind = KLineKind_YANG_4
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(levels[0]): //大阴
-		klkind = KLineKind_YIN_1
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(levels[1]): //中阴
-		klkind = KLineKind_YIN_2
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= float64(levels[2]): //小阴
-		klkind = KLineKind_YIN_3
-	case (k.FirstPrice-k.LastPrice)/k.FirstPrice >= 0: //阴十字
-		klkind = KLineKind_YIN_4
-
+	bili := math.Abs(k.LastPrice-k.FirstPrice) / tint
+	if k.LastPrice-k.FirstPrice > 0 { // 阳
+		if bili >= levels[0] { // 大阳线
+			klkind = KLineKind_YANG_1
+		} else if bili >= levels[1] { // 大阳线
+			klkind = KLineKind_YANG_2
+		} else if bili >= levels[2] { // 大阳线
+			klkind = KLineKind_YANG_3
+		} else { // 大阳线
+			klkind = KLineKind_YANG_4
+		}
+	} else {
+		if bili > levels[0] { // 大阳线
+			klkind = KLineKind_YIN_1
+		} else if bili > levels[1] { // 大阳线
+			klkind = KLineKind_YIN_2
+		} else if bili > levels[2] { // 大阳线
+			klkind = KLineKind_YIN_3
+		} else { // 大阳线
+			klkind = KLineKind_YIN_4
+		}
 	}
+
 	if klkind == KLineKind_YIN_4 || klkind == KLineKind_YIN_3 || klkind == KLineKind_YANG_4 || klkind == KLineKind_YANG_3 {
 		if ((k.HightPrice-k.LowPrice)-math.Abs(k.FirstPrice-k.LastPrice))/math.Abs(k.FirstPrice-k.LastPrice) >= 2 {
 			if k.LastPrice > k.FirstPrice {
@@ -284,11 +293,11 @@ func (k *KLine) BigAmplitude() float64 {
 	return k.HightPrice - k.LowPrice
 }
 
-func (k *KLine) LeadLevel(levels []float32) (top, down LeadLevel) {
+func (k *KLine) LeadLevel(hightPrice, lowPrice float64) (top, down LeadLevel) {
 	top, down = LEAD_LEVEL_LARGE, LEAD_LEVEL_LARGE
 	var leadChangeTop float64
 	var leadChangeDown float64
-	kind := k.kind(levels)
+	kind := k.kind(hightPrice, lowPrice)
 	if k.Amplitude() > 0 {
 		leadChangeTop = k.HightPrice - k.LastPrice
 		leadChangeDown = k.FirstPrice - k.LowPrice
