@@ -157,7 +157,7 @@ func (f *Future) SubscribeKline(path string, params []string, callback func(*api
 			kl.Amount, _ = strconv.ParseFloat(tmpKlmap["q"].(string), 64)
 			kl.V, _ = strconv.ParseFloat(tmpKlmap["V"].(string), 64)
 			kl.Q, _ = strconv.ParseFloat(tmpKlmap["Q"].(string), 64)
-			kl.Symbol = symbol
+			kl.Symbol = strings.ToLower(symbol)
 			kl.BeginTime = kl.BeginTime / 1000
 			kl.EndTime = kl.EndTime / 1000
 			callback(&kl, nil)
