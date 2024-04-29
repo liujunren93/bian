@@ -1,3 +1,0 @@
-package kine
-
-func Subscribe()

@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/liujunren93/bian/client/http"
+	"github.com/liujunren93/bian/client/websocket"
 )
 
 type Spot struct {
@@ -13,6 +14,7 @@ type Spot struct {
 	ApiKey     string
 	SecretKey  string
 	httpClient *http.Client
+	wsClient   *websocket.Client
 }
 
 var DefaultSpot = Spot{
@@ -30,6 +32,16 @@ func (s *Spot) apiClient() *http.Client {
 	}
 	return s.httpClient
 }
+func (s *Spot) getWsClient() *websocket.Client {
+	if s.wsClient == nil {
+		s.wsClient = websocket.NewClient(websocket.Config{
+			BaseURL:   s.apiBaseURL,
+			ApiKey:    s.ApiKey,
+			SecretKey: s.SecretKey,
+		})
+	}
+	return s.wsClient
+}
 
 func NewSpot(apiKey, secrat string) *Spot {
 	s := &Spot{
@@ -38,12 +50,7 @@ func NewSpot(apiKey, secrat string) *Spot {
 		ApiKey:     apiKey,
 		SecretKey:  secrat,
 	}
-	// 	httpClient: http.NewClient(http.Config{
-	// 		BaseURL:   "https://api.binance.com",
-	// 		ApiKey:    apiKey,
-	// 		SecretKey: secrat,
-	// 	}),
-	// }
+
 	return s
 }
 

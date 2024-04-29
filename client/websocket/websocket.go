@@ -1,4 +1,4 @@
-package client
+package websocket
 
 import (
 	"context"
@@ -11,18 +11,23 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type Config struct {
+	BaseURL   string
+	ApiKey    string
+	SecretKey string
+}
 type Client struct {
-	baseurl string
+	cfg     Config
 	conn    *websocket.Conn
 	header  http.Header
 	path    string
 	streams []string
 }
 
-func NewClient(baseurl string) (*Client, error) {
-	var client = Client{baseurl: baseurl}
+func NewClient(cfg Config) *Client {
+	var client = Client{cfg: cfg}
 
-	return &client, nil
+	return &client
 }
 
 func (c *Client) Subscribe(path string, header http.Header, streams ...string) error {
@@ -35,14 +40,13 @@ func (c *Client) Subscribe(path string, header http.Header, streams ...string) e
 		"params": streams,
 	}
 	buf, _ := json.Marshal(data)
-	var u = c.baseurl + path + "?streams="
+	var u = c.cfg.BaseURL + path + "?streams="
 	for _, stream := range streams {
 		u += stream + "/"
 	}
 	u = strings.TrimRight(u, "/")
 
-	conn, res, err := websocket.DefaultDialer.Dial(u, header)
-	fmt.Println(res)
+	conn, _, err := websocket.DefaultDialer.Dial(u, header)
 	if err != nil {
 		return err
 	}
