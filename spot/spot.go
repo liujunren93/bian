@@ -35,7 +35,7 @@ func (s *Spot) apiClient() *http.Client {
 func (s *Spot) getWsClient() *websocket.Client {
 	if s.wsClient == nil {
 		s.wsClient = websocket.NewClient(websocket.Config{
-			BaseURL:   s.apiBaseURL,
+			BaseURL:   s.wsBaseURL,
 			ApiKey:    s.ApiKey,
 			SecretKey: s.SecretKey,
 		})

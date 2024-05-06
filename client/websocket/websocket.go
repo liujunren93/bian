@@ -3,12 +3,11 @@ package websocket
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/liujunren93/share_utils/client/websocket"
 )
 
 type Config struct {
@@ -17,11 +16,13 @@ type Config struct {
 	SecretKey string
 }
 type Client struct {
-	cfg     Config
-	conn    *websocket.Conn
-	header  http.Header
-	path    string
-	streams []string
+	cfg Config
+}
+
+type Msg struct {
+	MsgType int
+	Msg     []byte
+	err     error
 }
 
 func NewClient(cfg Config) *Client {
@@ -30,10 +31,8 @@ func NewClient(cfg Config) *Client {
 	return &client
 }
 
-func (c *Client) Subscribe(path string, header http.Header, streams ...string) error {
-	c.path = path
-	c.header = header
-	c.streams = streams
+func (c *Client) Subscribe(ctx context.Context, path string, header http.Header, streams []string, collback func(*websocket.Msg, error)) error {
+
 	data := map[string]interface{}{
 		"method": "SUBSCRIBE",
 		"id":     time.Now().Unix(),
@@ -45,59 +44,11 @@ func (c *Client) Subscribe(path string, header http.Header, streams ...string) e
 		u += stream + "/"
 	}
 	u = strings.TrimRight(u, "/")
-
-	conn, _, err := websocket.DefaultDialer.Dial(u, header)
-	if err != nil {
+	cli, err := websocket.NewClient(u, websocket.WithHeader(header), websocket.WithPingInterval(time.Second*30))
+	if err == nil {
 		return err
 	}
-	conn.WriteMessage(websocket.TextMessage, buf)
-	c.conn = conn
+	cli.WriteMessage(websocket.TextMessage, buf)
+	cli.ReadMessage(ctx, collback)
 	return nil
-}
-
-func (c *Client) Unsubscribe(params ...string) error {
-	panic("")
-}
-
-func (c *Client) Response(ctx context.Context, f func(data []byte, err error)) {
-	ticker := time.NewTicker(time.Second)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				err := c.conn.WriteMessage(websocket.CloseMessage, nil)
-				if err != nil {
-					f(nil, err)
-				}
-				return
-			case <-ticker.C:
-				err := c.conn.WriteMessage(websocket.PingMessage, nil)
-				if err != nil {
-					f(nil, err)
-				}
-			default:
-				msgType, data, err := c.conn.ReadMessage()
-				fmt.Println(msgType, string(data), err)
-				if err != nil {
-					f(nil, err)
-					return
-				}
-				switch msgType {
-				case websocket.TextMessage:
-					f(data, err)
-				case websocket.CloseMessage:
-					f(data, err)
-					return
-				case websocket.PingMessage:
-					err := c.conn.WriteMessage(websocket.PongMessage, nil)
-					if err != nil {
-						f(nil, err)
-					}
-				}
-
-			}
-
-		}
-	}()
-
 }
