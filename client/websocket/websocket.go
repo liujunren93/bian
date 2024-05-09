@@ -45,10 +45,13 @@ func (c *Client) Subscribe(ctx context.Context, path string, header http.Header,
 	}
 	u = strings.TrimRight(u, "/")
 	cli, err := websocket.NewClient(u, websocket.WithHeader(header), websocket.WithPingInterval(time.Second*30))
-	if err == nil {
+	if err != nil {
 		return err
 	}
-	cli.WriteMessage(websocket.TextMessage, buf)
-	cli.ReadMessage(ctx, collback)
-	return nil
+	err = cli.WriteMessage(websocket.TextMessage, buf)
+	if err != nil {
+		return err
+	}
+	return cli.ReadMessage(ctx, collback)
+
 }

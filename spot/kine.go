@@ -16,13 +16,15 @@ func (s *Spot) SubscribeKline(ctx context.Context, streams []string, callback fu
 			callback(nil, err)
 			return
 		}
-		if m.Msg != nil {
-			callback(nil, m.Err)
+		if m.Msg == nil {
+			callback(nil, err)
 			return
 		}
-		var k entitys.Kine
+		var k entitys.KlineStreamResponse
 		err = json.Unmarshal(m.Msg, &k)
-		callback(&k, err)
+		if k.Stream != "" {
+			callback(&k.Data.Kline, err)
+		}
 
 	})
 	if err != nil {

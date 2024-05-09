@@ -8,6 +8,7 @@ type KlineResponse struct {
 	Symbol string `json:"s"` // 交易对
 	Kine   Kine   `json:"k"`
 }
+
 type Kine struct {
 	BeginTime             int             `json:"t"` //这根K线的起始时间
 	EndTime               int             `json:"T"` // 这根K线的结束时间
@@ -25,4 +26,17 @@ type Kine struct {
 	TradeAmount           decimal.Decimal `json:"q"` // 这根K线期间成交额
 	InitiativeTradeTotal  decimal.Decimal `json:"V"` // 主动买入的成交量
 	InitiativeTradeAmount decimal.Decimal `json:"Q"` // 主动买入的成交额
+}
+
+type KlineStreamResponse struct {
+	Stream string                  `json:"stream"`
+	Data   KlineStreamResponseData `json:"data"`
+	Result string                  `json:"result"`
+}
+
+type KlineStreamResponseData struct {
+	Event  string `json:"e"`
+	Time   int64  `json:"E"`
+	Symbol string `json:"s"`
+	Kline  Kine   `json:"k"`
 }
